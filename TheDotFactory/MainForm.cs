@@ -201,7 +201,7 @@ namespace TheDotFactory
         // populate preformatted text
         private void populateTextInsertCheckbox()
         {
-            string all = "", numbers = "", letters = "", uppercaseLetters = "", lowercaseLetters = "", symbols = "";
+            string all = "", extended = "", numbers = "", letters = "", uppercaseLetters = "", lowercaseLetters = "", symbols = "";
 
             // generate characters
             for (char character = ' '; character < 127; ++character)
@@ -216,8 +216,34 @@ namespace TheDotFactory
                 else if (Char.IsLetter(character) && !Char.IsLower(character)) { letters += character; uppercaseLetters += character; }
             }
 
+            // Create a StringBuilder to store the characters
+            StringBuilder sb = new StringBuilder();
+
+            // Define the character encoding (Windows-1252)
+            Encoding encoding = Encoding.GetEncoding(1252);
+
+            // Loop through the decimal values from 32 to 255
+            for (int i = 32; i <= 256; i++)
+            {
+                // Convert the decimal value to a byte and decode it using Windows-1252 encoding
+                byte[] bytes = { (byte)i };
+
+                // Skip control characters
+                List<int> skippedCharacters = new List<int>() { 127, 129, 141, 143, 144, 157, 160, 173 };
+                if (skippedCharacters.Contains(i)) {
+                    bytes[0] = (byte)'?';
+                }
+                string character = encoding.GetString(bytes);
+
+                // Append the character to the StringBuilder
+                sb.Append(character);
+
+                extended = sb.ToString();
+            }
+
             // add items
             cbxTextInsert.Items.Add(new ComboBoxItem("All", all));
+            cbxTextInsert.Items.Add(new ComboBoxItem("All + ASCII Extended", extended));
             cbxTextInsert.Items.Add(new ComboBoxItem("Numbers (0-9)", numbers));
             cbxTextInsert.Items.Add(new ComboBoxItem("Letters (A-z)", letters));
             cbxTextInsert.Items.Add(new ComboBoxItem("Lowercase letters (a-z)", lowercaseLetters));
@@ -276,104 +302,28 @@ namespace TheDotFactory
             updateSelectedFont(Properties.Settings.Default.InputFont);
         }
 
-        // try to parse character range
-        bool characterRangePointParse(string rangePointString, ref int rangePoint)
-        {
-            // trim the string
-            rangePointString = rangePointString.Trim();
-
-            // try to convert
-            try
-            {
-                // check if 0x is start of range
-                if (rangePointString.Substring(0, 2) == "0x")
-                {
-                    // remove 0x
-                    rangePointString = rangePointString.Substring(2, rangePointString.Length - 2);
-
-                    // do the parse
-                    rangePoint = Int32.Parse(rangePointString, System.Globalization.NumberStyles.HexNumber);
-                }
-                else
-                {
-                    // do the parse
-                    rangePoint = Int32.Parse(rangePointString);
-                }
-            }
-            catch
-            {
-                // error converting
-                return false;
-            }
-
-            // success
-            return true;
-        }
-
-        // expand and remove character ranges ( look for << x - y >> )
-        void expandAndRemoveCharacterRanges(ref string inputString)
-        {
-            // create the search pattern
-            //String searchPattern = @"<<.*-.*>>";
-            String searchPattern = @"<<(?<rangeStart>.*?)-(?<rangeEnd>.*?)>>";
-
-            // create the regex
-            Regex regex = new Regex(searchPattern, RegexOptions.Multiline);
-
-            // get matches
-            MatchCollection regexMatches = regex.Matches(inputString);
-
-            // holds the number of characters removed
-            int charactersRemoved = 0;
-
-            // for each match
-            foreach (Match regexMatch in regexMatches)
-            {
-                // get range start and end
-                int rangeStart = 0, rangeEnd = 0;
-                
-                // try to parse ranges
-                if (characterRangePointParse(regexMatch.Groups["rangeStart"].Value, ref rangeStart) &&
-                    characterRangePointParse(regexMatch.Groups["rangeEnd"].Value, ref rangeEnd))
-                {
-                    // remove this from the string
-                    inputString = inputString.Remove(regexMatch.Index - charactersRemoved, regexMatch.Length);
-
-                    // save the number of chars removed so that we can fixup index (the index
-                    // of the match changes as we remove characters)
-                    charactersRemoved += regexMatch.Length;
-
-                    // create a string from these values
-                    for (int charIndex = rangeStart; charIndex <= rangeEnd; ++charIndex)
-                    {
-                        // shove this character to a unicode char container
-                        char unicodeChar = (char)charIndex;
-
-                        // add this to the string
-                        inputString += unicodeChar;
-                    }
-                }
-            }
-        }
 
         // get the characters we need to generate
         string getCharactersToGenerate()
         {
             string inputText = txtInputText.Text;
 
+            System.Diagnostics.Debug.WriteLine(inputText);
+
             //
             // Expand and remove all ranges from the input text (look for << x - y >>
             //
 
             // espand the ranges into the input text
-            expandAndRemoveCharacterRanges(ref inputText);
+            // expandAndRemoveCharacterRanges(ref inputText);
             
             //
             // iterate through the inputted text and shove to sorted string, removing all duplicates
             //
 
             // sorted list for insertion/duplication removal
-            SortedList<char, char> characterList = new SortedList<char, char>();
+            List<char> characterList = new List<char>();
+            Console.Write(characterList);
 
             // iterate over the characters in the textbox
             for (int charIndex = 0; charIndex < inputText.Length; ++charIndex)
@@ -382,8 +332,8 @@ namespace TheDotFactory
                 char insertionCandidateChar = inputText[charIndex];
 
                 // insert the char, if not already in the list and if not space ()
-                if (!characterList.ContainsKey(insertionCandidateChar))
-                {
+                // if (!characterList.Contains(insertionCandidateChar))
+                // {
                     // check if space character
                     if (insertionCandidateChar == ' ' && !m_outputConfig.generateSpaceCharacterBitmap)
                     {
@@ -399,21 +349,25 @@ namespace TheDotFactory
                     }
 
                     // not in list, add
-                    characterList.Add(inputText[charIndex], ' ');
-                }
+                    characterList.Add(inputText[charIndex]);
+                // }
             }
+
+
+            // characterList = characterList.Distinct().ToList();
 
             // now output the sorted list to a string
             string characterListString = "";
 
             // iterate over the sorted characters to create the string
-            foreach (char characterKey in characterList.Keys)
+            foreach (char characterKey in characterList)
             {
                 // add to string
                 characterListString += characterKey;
             }
 
             // return the character
+            //return characterListString;
             return characterListString;
         }
 
@@ -841,6 +795,8 @@ namespace TheDotFactory
 
             // get teh characters we need to generate from the input text, removing duplicates
             fontInfo.generatedChars = getCharactersToGenerate();
+
+            System.Diagnostics.Debug.WriteLine(fontInfo.generatedChars.Length);
 
             // set font into into
             fontInfo.font = font;
@@ -1301,6 +1257,9 @@ namespace TheDotFactory
             int differenceBetweenCharsForNewGroup = m_outputConfig.generateLookupBlocks ?
                     m_outputConfig.lookupBlocksNewAfterCharCount : int.MaxValue;
 
+            characterBlock = new CharacterDescriptorArrayBlock();
+            characterBlock.characters = new ArrayList();
+
             // iterate over characters, saving previous character each time
             for (int charIndex = 0;
                  charIndex < fontInfo.characters.Length;
@@ -1310,6 +1269,7 @@ namespace TheDotFactory
                 currentCharacter = fontInfo.characters[charIndex].character;
 
                 // check if this character is too far from the previous character and it isn't the first char
+                /**
                 if (currentCharacter - previousCharacter < differenceBetweenCharsForNewGroup && previousCharacter != '\0')
                 {
                     // it may not be far enough to generate a new group but it still may be non-sequential
@@ -1334,6 +1294,7 @@ namespace TheDotFactory
                     characterBlock = new CharacterDescriptorArrayBlock();
                     characterBlock.characters = new ArrayList();
                 }
+                **/
 
                 // add to current block
                 charDescArrayAddCharacter(characterBlock, fontInfo, currentCharacter,
