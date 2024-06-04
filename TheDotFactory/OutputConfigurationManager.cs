@@ -16,7 +16,8 @@ namespace TheDotFactory
         {
             None,               // no padding removal
             Tighest,            // remove padding as much as possible, per bitmap
-            Fixed               // remove padding as much as the bitmap with least padding
+            Fixed,              // remove padding as much as the bitmap with least padding
+            Smart               // remove padding and note down the offset
         }
 
         // Line wrap
@@ -117,8 +118,8 @@ namespace TheDotFactory
         public bool flipVertical = false;
 
         // padding removal
-        public PaddingRemoval paddingRemovalHorizontal = PaddingRemoval.Fixed;
-        public PaddingRemoval paddingRemovalVertical = PaddingRemoval.Tighest;
+        public PaddingRemoval paddingRemovalHorizontal = PaddingRemoval.Smart;
+        public PaddingRemoval paddingRemovalVertical = PaddingRemoval.Smart;
 
         // line wrap
         public LineWrap lineWrap = LineWrap.AtColumn;
@@ -132,11 +133,11 @@ namespace TheDotFactory
         // descriptors
         public bool generateLookupArray = true;
         public DescriptorFormat descCharWidth = DescriptorFormat.DisplayInBits;
-        public DescriptorFormat descCharHeight = DescriptorFormat.DontDisplay;
-        public DescriptorFormat descFontHeight = DescriptorFormat.DisplayInBytes;
+        public DescriptorFormat descCharHeight = DescriptorFormat.DisplayInBits;
+        public DescriptorFormat descFontHeight = DescriptorFormat.DisplayInBits;
         public bool generateLookupBlocks = false;
         public int lookupBlocksNewAfterCharCount = 80;
-        public DescriptorFormat descImgWidth = DescriptorFormat.DisplayInBytes;
+        public DescriptorFormat descImgWidth = DescriptorFormat.DisplayInBits;
         public DescriptorFormat descImgHeight = DescriptorFormat.DisplayInBits;
 
         // space generation
@@ -144,11 +145,11 @@ namespace TheDotFactory
         public int spaceGenerationPixels = 2;
 
         // variable formats
-        public string varNfBitmaps = "const uint_8 {0}Bitmaps";
+        public string varNfBitmaps = "const uint8_t {0}Bitmaps";
         public string varNfCharInfo = "const FONT_CHAR_INFO {0}Descriptors";
         public string varNfFontInfo = "const FONT_INFO {0}FontInfo";
-        public string varNfWidth = "const uint_8 {0}Width";
-        public string varNfHeight = "const uint_8 {0}Height";
+        public string varNfWidth = "const uint8_t {0}Width";
+        public string varNfHeight = "const uint8_t {0}Height";
 
         // display name
         public string displayName = "";

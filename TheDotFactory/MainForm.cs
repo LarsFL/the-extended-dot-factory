@@ -23,6 +23,7 @@ using System.Windows.Forms;
 using System.Collections;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace TheDotFactory
 {
@@ -112,6 +113,10 @@ namespace TheDotFactory
             
             // offset into total array
             public int offsetInBytes;
+
+            // offset of character borders
+            public int offsetX;
+            public int offsetY;
         }
 
         // holds a range of chars
@@ -128,6 +133,8 @@ namespace TheDotFactory
                 public int height;
                 public int width;
                 public int offset;
+                public int offsetX;
+                public int offsetY;
             }
         }
         
@@ -308,7 +315,7 @@ namespace TheDotFactory
         {
             string inputText = txtInputText.Text;
 
-            System.Diagnostics.Debug.WriteLine(inputText);
+            Debug.WriteLine(inputText);
 
             //
             // Expand and remove all ranges from the input text (look for << x - y >>
@@ -490,6 +497,8 @@ namespace TheDotFactory
 
                 // get the bitmaps border
                 getBitmapBorder(charInfoArray[charIdx].bitmapOriginal, bitmapBorder);
+
+                Debug.WriteLine(bitmapBorder.topY);
 
                 // check if we need to loosen up the tightest border
                 tightestBorder.leftX = Math.Min(bitmapBorder.leftX, tightestBorder.leftX);
@@ -786,7 +795,7 @@ namespace TheDotFactory
             // return largest
             return largestRect;
         }
-
+ 
         // populate the font info
         private FontInfo populateFontInfo(Font font)
         {
@@ -855,6 +864,42 @@ namespace TheDotFactory
                 // find the common tightest border
                 findTightestCommonBitmapBorder(fontInfo.characters, ref tightestCommonBorder);
             }
+
+            // only perform if padding type specifies
+            if (m_outputConfig.paddingRemovalHorizontal == OutputConfiguration.PaddingRemoval.Smart ||
+                m_outputConfig.paddingRemovalVertical == OutputConfiguration.PaddingRemoval.Smart)
+            {
+                // TODO do smart padding removal
+                // getBitmapBorder 
+                for (int charIdx = 0; charIdx < fontInfo.generatedChars.Length; ++charIdx)
+                {
+                    Bitmap charBorder = fontInfo.characters[charIdx].bitmapOriginal;
+                    BitmapBorder bitmapBorder = new BitmapBorder();
+
+                    // search for first column (x) from the left to contain data
+                    for (bitmapBorder.leftX = 0; bitmapBorder.leftX < charBorder.Width; ++bitmapBorder.leftX)
+                    {
+                        // if found first column from the left, stop looking
+                        if (!bitmapColumnIsEmpty(charBorder, bitmapBorder.leftX)) break;
+                    }
+
+                    // search for first row (y) from the bottom to contain data
+                    for (bitmapBorder.bottomY = charBorder.Height - 1; bitmapBorder.bottomY >= 0; --bitmapBorder.bottomY)
+                    {
+                        // if found first column from the left, stop looking
+                        if (!bitmapRowIsEmpty(charBorder, bitmapBorder.bottomY)) break;
+                    }
+
+                    fontInfo.characters[charIdx].offsetX = bitmapBorder.leftX;
+                    fontInfo.characters[charIdx].offsetY = charBorder.Height - bitmapBorder.bottomY;
+
+                    // Debug.WriteLine(bitmapBorder.leftX, charBorder.Height - bitmapBorder.bottomY);
+                }
+
+
+            }
+
+
 
             //
             // iterate thruogh all bitmaps and generate the bitmap we will convert to string
@@ -1231,15 +1276,17 @@ namespace TheDotFactory
         private void charDescArrayAddCharacter(CharacterDescriptorArrayBlock desciptorBlock,
                                                FontInfo fontInfo, 
                                                char character,
-                                               int width, int height, int offset)
+                                               int width, int height, int offset, int offsetX, int offsetY)
         {
             // create character descriptor
             CharacterDescriptorArrayBlock.Character charDescriptor = new CharacterDescriptorArrayBlock.Character();
-                charDescriptor.character = character;
-                charDescriptor.font = fontInfo;
-                charDescriptor.height = height;
-                charDescriptor.width = width;
-                charDescriptor.offset = offset;
+            charDescriptor.character = character;
+            charDescriptor.font = fontInfo;
+            charDescriptor.height = height;
+            charDescriptor.width = width;
+            charDescriptor.offset = offset;
+            charDescriptor.offsetX = offsetX;
+            charDescriptor.offsetY = offsetY;
 
             // shove this character to the descriptor block
             desciptorBlock.characters.Add(charDescriptor);
@@ -1296,11 +1343,15 @@ namespace TheDotFactory
                 }
                 **/
 
+                // fontInfo.characters[charIndex].bitmapOriginal;
+
                 // add to current block
                 charDescArrayAddCharacter(characterBlock, fontInfo, currentCharacter,
                                           fontInfo.characters[charIndex].width,
                                           fontInfo.characters[charIndex].height,
-                                          fontInfo.characters[charIndex].offsetInBytes);
+                                          fontInfo.characters[charIndex].offsetInBytes,
+                                          fontInfo.characters[charIndex].offsetX,
+                                          fontInfo.characters[charIndex].offsetY);
 
                 // save previous char
                 previousCharacter = currentCharacter;
@@ -1394,10 +1445,12 @@ namespace TheDotFactory
                 foreach (CharacterDescriptorArrayBlock.Character character in block.characters)
                 {
                     // add character
-                    resultTextSource += String.Format("\t{{{0}{1}{2}}}, \t\t{3}{4}{5}" + nl,
+                    resultTextSource += String.Format("\t{{{0}{1}{2}, {3}, {4}}}, \t\t{5}{6}{7}" + nl,
                                                     getCharacterDescString(m_outputConfig.descCharWidth, character.width),
                                                     getCharacterDescString(m_outputConfig.descCharHeight, character.height),
                                                     character.offset,
+                                                    character.offsetX,
+                                                    character.offsetY,
                                                     m_commentStartString,
                                                     character.character,
                                                     m_commentEndString + " ");
@@ -1669,6 +1722,9 @@ namespace TheDotFactory
                 resultTextHeader += String.Format("{0}Font data for {1} {2}pt{3}" + nl,
                                                     m_commentStartString, font.Name, Math.Round(font.Size),
                                                     m_commentEndString);
+
+                // add main header include
+                resultTextSource += String.Format("#include \"fonts.h\"" + nl + nl);
             }
 
             // populate the font info
